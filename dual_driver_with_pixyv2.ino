@@ -4,9 +4,9 @@
 #include <SabertoothSimplified.h>
 
 SoftwareSerial leftSerial(NOT_A_PIN, 9); // RX on no pin (unused), TX on pin 11 (to S1).
-SabertoothSimplified leftDriver(SWSerial1); // 
-SoftwareSerial rightSerial(NOT_A_PIN, 10); // RX on no pin (unused), TX on pin 11 (to S1).
-SabertoothSimplified rightDriver(SWSerial2); 
+SabertoothSimplified leftDriver(leftSerial); // 
+SoftwareSerial rightSerial(NOT_A_PIN, 11); // RX on no pin (unused), TX on pin 11 (to S1).
+SabertoothSimplified rightDriver(rightSerial); 
 unsigned int counter=0;
 
 
@@ -14,6 +14,7 @@ int powerL = 0;
 int powerR = 0;
 boolean turning = false;
 int turningVal = 0;
+int lastBlockTime = 0;
 
 
 Pixy pixy;
@@ -39,31 +40,29 @@ void loop()
   blocks = pixy.getBlocks();
   if (blocks)
   {
-    i++;
-    counter=0;
-    if (i%50==0)
-    {
-      sprintf(buf, "Detected %d:\n", blocks);
-      Serial.print(buf);
-      for (j=0; j<blocks; j++)
-      {
-        sprintf(buf, "  block %d: ", j);
-        Serial.print(buf); 
-        pixy.blocks[j].print();
-        //pixy.blocks[j].x,y,width,height,signature
-        turningVal = canTurn(pixy.blocks[j].x);
-        if(turningVal != 0)
-          turning = true;
-
-        turnCar(turningVal);
-      }
-    }
-    if(powerL <=120 || powerR <= 120 && !turning) //if turning, there will be a power difference, need the !turning to stop from random ramping
+  
+    //pixy.blocks[j].x,y,width,height,signature
+    turningVal = canTurn(pixy.blocks[0].x);
+    if(turningVal != 0)
+      turning = true;
+      
+    if(powerL <=120 || powerR <= 120 && turning == false) //if turning, there will be a power difference, need the !turning to stop from random ramping
       rampUp();
-  }else if (!blocks && (powerL != 0 || powerR != 0))
+      
+    turnCar(turningVal);
+    lastBlockTime = millis();
+  
+
+  }
+  else if(millis() - lastBlockTime > 200)
   {
     slowToZero();
   }
+//  }else if (blocks == 0 && (powerL != 0 || powerR != 0))
+//  {
+//    slowToZero();
+//  }
+
 
 }
 
@@ -91,6 +90,7 @@ void rampUp()
   }
   delay(10);
   Serial.print("Ramping Up");
+  Serial.println(powerR);
  }
 
 void slowToZero()
@@ -117,7 +117,6 @@ void slowToZero()
       rightDriver.motor(1, ++powerR);
       rightDriver.motor(2, powerR);      
     }
-
     delay(10);
   }
   else if(powerL > 0 && powerR > 0)
@@ -144,7 +143,8 @@ void slowToZero()
     }
 
     delay(10);
-    Serial.print("Slowing Down");
+    Serial.print("Slowing Down ");
+    Serial.println(powerR);
   }
 }
 
